@@ -1,0 +1,8 @@
+[package]
+name = "rs-fwt"
+version = "0.1.0"
+authors = ["Chen Weiguang <chen.weiguang@gmail.com>"]
+
+[dependencies]
+vlog = "0.1.4"
+structopt = "0.2.10"
