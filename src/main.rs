@@ -26,10 +26,10 @@ fn main() -> Result<(), Error> {
     let (tx, rx) = channel();
     let delay = Duration::from_secs(1);
 
-    let mut watcher: &Watcher = if !config.force_poll {
-        &watcher(tx, Duration::from_secs(1))?
+    let mut watcher: Box<Watcher> = if !config.force_poll {
+        Box::new(watcher(tx, delay)?)
     } else {
-        &PollWatcher::new(tx, Duration::from_secs(1))?
+        Box::new(PollWatcher::new(tx, delay)?)
     };
 
     v0!("Filewatch Trigger has started, CTRL-C to terminate...");
