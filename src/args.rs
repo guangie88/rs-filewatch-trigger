@@ -16,8 +16,8 @@ pub struct ArgConf {
     pub path: PathBuf,
 
     /// Glob pattern(s) for file matching (comma delimited)
-    #[structopt(short = "f", long = "filter", default_value = "*.*")]
-    pub filter: GlobMatchers,
+    #[structopt(short = "f", long = "filters", default_value = "*.*")]
+    pub filters: GlobMatchers,
 
     /// Event type to trigger on (0=NONE, 1=CREATED, 2=DELETED, 4=MODIFIED, 8=MOVED)
     #[structopt(short = "e", long = "event", default_value = "1")]

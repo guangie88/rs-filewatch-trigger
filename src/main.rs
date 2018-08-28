@@ -25,23 +25,8 @@ mod watchers;
 
 use actions::CmdAction;
 use args::{ActionConf, ArgConf};
-use types::{EventType, GlobMatcher, PathEvent};
+use types::{EventType, PathEvent};
 use watchers::WeakWatcher;
-
-fn select_path_event<P: AsRef<Path>>(
-    filters: &[GlobMatcher],
-    path: P,
-    conf_event: EventType,
-    target_event: EventType,
-) -> Option<PathEvent> {
-    if conf_event & target_event != EventType::NONE
-        && filters.iter().any(|f| f.is_match(path.as_ref()))
-    {
-        Some(PathEvent::new(path, target_event))
-    } else {
-        None
-    }
-}
 
 fn main() -> Result<()> {
     let config = ArgConf::from_args();
@@ -60,34 +45,26 @@ fn main() -> Result<()> {
     watcher.watch(&config.path, RecursiveMode::Recursive)?;
     v1!("Filewatch Trigger has started, CTRL-C to terminate...");
 
+    let select_path_event = |path: &Path, target_event| -> Option<PathEvent> {
+        if config.event & target_event != EventType::NONE
+            && config.filters.iter().any(|filter| filter.is_match(path))
+        {
+            Some(PathEvent::new(path, target_event))
+        } else {
+            None
+        }
+    };
+
     loop {
         match rx.recv() {
             Ok(event) => {
                 let event_opt = match &event {
-                    Create(path) => select_path_event(
-                        &config.filter,
-                        path,
-                        config.event,
-                        EventType::CREATED,
-                    ),
-                    Remove(path) => select_path_event(
-                        &config.filter,
-                        path,
-                        config.event,
-                        EventType::DELETED,
-                    ),
-                    Write(path) => select_path_event(
-                        &config.filter,
-                        path,
-                        config.event,
-                        EventType::MODIFIED,
-                    ),
-                    Rename(old_path, _) => select_path_event(
-                        &config.filter,
-                        old_path,
-                        config.event,
-                        EventType::MOVED,
-                    ),
+                    Create(path) => select_path_event(path, EventType::CREATED),
+                    Remove(path) => select_path_event(path, EventType::DELETED),
+                    Write(path) => select_path_event(path, EventType::MODIFIED),
+                    Rename(old_path, _) => {
+                        select_path_event(old_path, EventType::MOVED)
+                    }
                     _ => None,
                 };
 
