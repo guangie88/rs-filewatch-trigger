@@ -6,6 +6,7 @@ extern crate globset;
 #[macro_use]
 extern crate maplit;
 extern crate notify;
+extern crate path_absolutize;
 extern crate strfmt;
 extern crate structopt;
 #[macro_use]
@@ -13,9 +14,9 @@ extern crate structopt_derive;
 #[macro_use]
 extern crate vlog;
 
-use actions::base::{Action, Result};
 use notify::{watcher, DebouncedEvent::*, PollWatcher, RecursiveMode, Watcher};
-use std::{path::Path, sync::mpsc::channel, time::Duration};
+use path_absolutize::Absolutize;
+use std::{env, path::Path, sync::mpsc::channel, time::Duration};
 use structopt::StructOpt;
 
 mod actions;
@@ -23,7 +24,7 @@ mod args;
 mod types;
 mod watchers;
 
-use actions::CmdAction;
+use actions::{base::{Action, Result}, CmdAction};
 use args::{ActionConf, ArgConf};
 use types::{EventType, PathEvent};
 use watchers::WeakWatcher;
@@ -45,30 +46,36 @@ fn main() -> Result<()> {
     watcher.watch(&config.path, RecursiveMode::Recursive)?;
     v1!("Filewatch Trigger has started, CTRL-C to terminate...");
 
-    let select_path_event = |path: &Path, target_event| -> Option<PathEvent> {
+    let select_path_event = |path: &Path, target_event| -> Result<Option<PathEvent>> {
         if config.event & target_event != EventType::NONE
             && config.filters.iter().any(|filter| filter.is_match(path))
         {
-            Some(PathEvent::new(path, target_event))
+            let triggered_path = if config.relative {
+                path.strip_prefix(env::current_dir()?)?.to_owned()
+            } else {
+                path.absolutize()?
+            };
+
+            Ok(Some(PathEvent::new(triggered_path, target_event)))
         } else {
-            None
+            Ok(None)
         }
     };
 
     loop {
         match rx.recv() {
             Ok(event) => {
-                let event_opt = match &event {
+                let path_event = match &event {
                     Create(path) => select_path_event(path, EventType::CREATED),
                     Remove(path) => select_path_event(path, EventType::DELETED),
                     Write(path) => select_path_event(path, EventType::MODIFIED),
                     Rename(old_path, _) => {
                         select_path_event(old_path, EventType::MOVED)
                     }
-                    _ => None,
-                };
+                    _ => Ok(None),
+                }?;
 
-                if let Some(path_event) = event_opt {
+                if let Some(path_event) = path_event {
                     let action_res = match &config.action {
                         ActionConf::Cmd {
                             cmd,

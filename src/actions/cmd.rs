@@ -19,11 +19,11 @@ fn run_raw_command(cmd: &str, print_stdout: bool, print_stderr: bool) -> Result<
 
     if let Ok(ref output) = output {
         if print_stdout {
-            v0!("{}", str::from_utf8(&output.stdout)?);
+            print!("{}", str::from_utf8(&output.stdout)?);
         }
 
         if print_stderr {
-            ve0!("{}", str::from_utf8(&output.stderr)?);
+            eprint!("{}", str::from_utf8(&output.stderr)?);
         }
     }
 
