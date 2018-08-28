@@ -45,10 +45,18 @@ pub struct ArgConf {
 pub enum ActionConf {
     #[structopt(name = "cmd")]
     Cmd {
-        /// Shell template command to run with string interpolation:
+        /// Shell template command to run with string interpolation
         /// ({path}: triggered file path)
         /// ({event}: event type number)
         #[structopt()]
         cmd: String,
+
+        /// Prints shell stdout to main stdout
+        #[structopt(long = "print-stdout")]
+        print_stdout: bool,
+
+        /// Prints shell stderr to main stderr
+        #[structopt(long = "print-stderr")]
+        print_stderr: bool,
     },
 }

@@ -70,8 +70,14 @@ fn main() -> Result<()> {
 
                 if let Some(path_event) = event_opt {
                     let action_res = match &config.action {
-                        ActionConf::Cmd { cmd, .. } => {
-                            let cmd_action = CmdAction::new(cmd);
+                        ActionConf::Cmd {
+                            cmd,
+                            print_stdout,
+                            print_stderr,
+                            ..
+                        } => {
+                            let cmd_action =
+                                CmdAction::new(cmd, *print_stdout, *print_stderr);
                             cmd_action.invoke(&path_event)
                         }
                     };
