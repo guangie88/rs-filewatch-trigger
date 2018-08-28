@@ -1,7 +1,16 @@
 [package]
-name = "fwt"
+name = "rs-filewatch-trigger"
 version = "0.1.0"
 authors = ["Chen Weiguang <chen.weiguang@gmail.com>"]
+description = "FileWatch Trigger to run various actions"
+repository = "https://github.com/guangie88/rs-filewatch-trigger"
+readme = "README.md"
+categories = ["command-line-utilities"]
+license = "MIT"
+
+[badges]
+travis-ci = { repository = "guangie88/rs-filewatch-trigger" }
+codecov = { repository = "guangie88/rs-filewatch-trigger" }
 
 [dependencies]
 bitflags = "1.0.4"
@@ -16,3 +25,7 @@ structopt = "0.2.10"
 structopt-derive = "0.2.10"
 vlog = "0.1.4"
 path-absolutize = "1.1.0"
+
+[[bin]]
+name = "fwt"
+path = "src/main.rs"

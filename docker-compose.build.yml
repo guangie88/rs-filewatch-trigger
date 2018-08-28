@@ -1,0 +1,19 @@
+version: '2'
+services:
+  build:
+    image: 'clux/muslrust:stable'
+    command:
+      - cargo
+      - build
+      - '--release'
+    volumes:
+      - '.:/volume'
+    env_file: .env-build
+  clean:
+    image: 'clux/muslrust:stable'
+    command:
+      - cargo
+      - clean
+    volumes:
+      - '.:/volume'
+    env_file: .env-build

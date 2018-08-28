@@ -1,0 +1,99 @@
+language: rust
+
+env:
+  global:
+  - BINARY_NAME=fwt
+  - REPO_USERNAME=guangie88
+  - REPO_NAME=rs-filewatch-trigger
+
+matrix:
+  include:
+  - services: docker
+    env:
+      - LINT=true
+      - PUBLISH=true
+  - services: docker
+    env:
+      - ARTIFACT=true
+      - ARTIFACTS_DIR=./artifacts
+  - services: docker
+    env:
+      - COVERAGE=true
+  - rust: stable
+    sudo: false
+  - rust: beta
+    sudo: false
+  - rust: nightly
+    sudo: false
+  fast_finish: true
+
+before_script:
+- set -e
+- |
+  if [ "$LINT" = "true" ]; then
+    docker-compose -f docker-compose.lint-test.yml build lint-test
+  elif [ "$ARTIFACT" = "true" ]; then
+    echo "Artifact not dealing with 'before_script'"
+  elif [ "$COVERAGE" = "true" ]; then
+    echo "Coverage not dealing with 'before_script'"
+  else
+    cargo test --all --no-run --verbose
+  fi
+
+script:
+- |
+  if [ "$LINT" = "true" ]; then
+    docker-compose -f docker-compose.lint-test.yml run lint-test
+  elif [ "$ARTIFACT" = "true" ]; then
+    docker-compose -f docker-compose.build.yml run -u $UID:`id -g` build
+    mkdir $ARTIFACTS_DIR
+    cp ./target/x86_64-unknown-linux-musl/release/$BINARY_NAME $ARTIFACTS_DIR
+  elif [ "$COVERAGE" = "true" ]; then
+    echo "Coverage not dealing with 'script'"
+  else
+    cargo doc --all
+    cargo test --all --verbose
+  fi
+
+after_success:
+- |
+  if [ "$PUBLISH" = "true" ] && [ -n "$TRAVIS_TAG" ]; then
+    # publish when this is a new tag
+    cargo login "$CRATES_TOKEN"
+
+    # publish all self dependency libraries first
+    cd ignore-lib
+    cargo publish
+    cd ..
+    
+    # then publish binary
+    cargo publish
+  elif [ "$ARTIFACT" = "true" ] && [ -n "$TRAVIS_TAG" ]; then
+    # upload binary artifact when this is a new tag
+    # this needs to be jq processed to extract out the `id` value
+    TAG_ID=$(curl -X GET \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      "https://api.github.com/repos/$REPO_USERNAME/$REPO_NAME/releases" \
+      | jq -r '.[] | select(.tag_name == "'$TRAVIS_TAG'").id')
+
+    # formulate zip
+    ZIP_SUFFIX=`uname -s | tr '[:upper:]' '[:lower:]'`-`uname -i`
+    ZIP_FILE=$BINARY_NAME-$TRAVIS_TAG-$ZIP_SUFFIX.zip
+    zip -j $ZIP_FILE "$ARTIFACTS_DIR/$BINARY_NAME"
+
+    curl -X POST \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Content-Type: application/zip" \
+      --upload-file $ZIP_FILE \
+      "https://uploads.github.com/repos/$REPO_USERNAME/$REPO_NAME/releases/$TAG_ID/assets?name=$ZIP_FILE"
+  elif [ "$COVERAGE" = "true" ] && [ -z "$TRAVIS_TAG" ]; then
+    docker run --security-opt seccomp=unconfined -v "$PWD:/volume" \
+      guangie88/ubuntu-cargo-tarpaulin:xenial-stable "
+        cargo tarpaulin --all --out Xml \
+        && bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN"
+  fi
+
+branches:
+  only:
+  - master
+  - /^v\d+\.\d+\.\d+(-\S*)?$/

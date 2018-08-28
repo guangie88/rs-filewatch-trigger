@@ -1,0 +1,12 @@
+FROM guangie88/rs-cider:1.28.0
+
+WORKDIR /app
+COPY ./Cargo.toml ./Cargo.lock ./rustfmt.toml ./
+
+RUN set -x \
+    && cargo fetch --locked -v
+
+COPY ./src/ ./src/
+
+RUN cargo +nightly clippy --all \
+    && cargo test --all --no-run

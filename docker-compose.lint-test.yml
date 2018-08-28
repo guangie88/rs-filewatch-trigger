@@ -1,0 +1,12 @@
+version: '2'
+services:
+  lint-test:
+    build:
+      context: .
+      dockerfile: Dockerfile-lint-test
+    command:
+      - bash
+      - '-c'
+      - 'rustfmt --check src/**.rs
+         && cargo +nightly clippy --all
+         && cargo test --all'
