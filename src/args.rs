@@ -23,6 +23,10 @@ pub struct ArgConf {
     #[structopt(short = "e", long = "event", default_value = "1")]
     pub event: EventType,
 
+    /// Delay interval in milliseconds between each file watch detection
+    #[structopt(short = "d", long = "delay", default_value = "1000")]
+    pub delay_ms: u64,
+
     /// Force using polling implementation, works for any platform
     #[structopt(long = "force-poll")]
     pub force_poll: bool,

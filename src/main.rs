@@ -35,7 +35,7 @@ fn select_path_event<P: AsRef<Path>>(
     target_event: EventType,
 ) -> Option<PathEvent> {
     if conf_event & target_event != EventType::NONE
-        && filters.iter().all(|f| f.is_match(path.as_ref()))
+        && filters.iter().any(|f| f.is_match(path.as_ref()))
     {
         Some(PathEvent::new(path, target_event))
     } else {
@@ -46,10 +46,10 @@ fn select_path_event<P: AsRef<Path>>(
 fn main() -> Result<()> {
     let config = ArgConf::from_args();
     vlog::set_verbosity_level(usize::from(config.verbose));
-    v2!("Config: {:#?}", config);
+    v3!("Config: {:#?}", config);
 
     let (tx, rx) = channel();
-    let delay = Duration::from_secs(1);
+    let delay = Duration::from_millis(config.delay_ms);
 
     let mut watcher: Box<WeakWatcher> = if !config.force_poll {
         Box::new(watcher(tx, delay)?)
@@ -58,13 +58,11 @@ fn main() -> Result<()> {
     };
 
     watcher.watch(&config.path, RecursiveMode::Recursive)?;
-    v0!("Filewatch Trigger has started, CTRL-C to terminate...");
+    v1!("Filewatch Trigger has started, CTRL-C to terminate...");
 
     loop {
         match rx.recv() {
             Ok(event) => {
-                v0!("{:?}", event);
-
                 let event_opt = match &event {
                     Create(path) => select_path_event(
                         &config.filter,
@@ -101,12 +99,13 @@ fn main() -> Result<()> {
                         }
                     };
 
-                    if let Err(e) = action_res {
-                        ve0!("Action error: {}", e);
+                    match action_res {
+                        Ok(()) => {
+                            v2!("Invoked action on path: {:?}", path_event.path)
+                        }
+                        Err(e) => ve0!("Action error: {}", e),
                     }
                 }
-
-                v2!("Event: {:?}", event);
             }
             Err(e) => ve0!("Watch error: {:?}", e),
         }
