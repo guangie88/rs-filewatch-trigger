@@ -1,9 +1,8 @@
-use failure::Error;
-use std::path::Path;
 use std::process::{Command, Output};
 use strfmt::strfmt;
 
-use actions::base::{Action, EventType, Result};
+use actions::{Action, Result};
+use types::PathEvent;
 
 pub struct CmdAction {
     pub cmd: String,
@@ -18,7 +17,7 @@ fn run_raw_command(cmd: &str) -> Result<Output> {
 }
 
 impl CmdAction {
-    fn new<S: AsRef<str>>(cmd: S) -> CmdAction {
+    pub fn new<S: AsRef<str>>(cmd: S) -> CmdAction {
         CmdAction {
             cmd: cmd.as_ref().to_owned(),
         }
@@ -26,7 +25,10 @@ impl CmdAction {
 }
 
 impl Action for CmdAction {
-    fn invoke(&self, path: &Path, event: EventType) -> Result<()> {
+    fn invoke(&self, path_event: &PathEvent) -> Result<()> {
+        let path = &path_event.path;
+        let event = &path_event.event;
+
         let mapping = hashmap! {
             "path".to_owned() => path.to_str()
                 .map(|s| s.to_owned())

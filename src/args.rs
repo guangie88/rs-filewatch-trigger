@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use actions::base::EventType;
+use types::{EventType, GlobMatchers};
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -17,7 +17,7 @@ pub struct ArgConf {
 
     /// Glob pattern(s) for file matching (comma delimited)
     #[structopt(short = "f", long = "filter", default_value = "*.*")]
-    pub filter: String,
+    pub filter: GlobMatchers,
 
     /// Event type to trigger on (0=NONE, 1=CREATED, 2=DELETED, 4=MODIFIED, 8=MOVED)
     #[structopt(short = "e", long = "event", default_value = "1")]

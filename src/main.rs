@@ -2,6 +2,7 @@
 extern crate bitflags;
 #[macro_use]
 extern crate failure;
+extern crate globset;
 #[macro_use]
 extern crate maplit;
 extern crate notify;
@@ -12,22 +13,40 @@ extern crate structopt_derive;
 #[macro_use]
 extern crate vlog;
 
-use failure::Error;
+use actions::base::{Action, Result};
 use notify::{watcher, DebouncedEvent::*, PollWatcher, RecursiveMode, Watcher};
-use std::sync::mpsc::channel;
-use std::time::Duration;
+use std::{path::Path, sync::mpsc::channel, time::Duration};
 use structopt::StructOpt;
 
 mod actions;
 mod args;
+mod types;
 mod watchers;
 
+use actions::CmdAction;
 use args::{ActionConf, ArgConf};
+use types::{EventType, GlobMatcher, PathEvent};
 use watchers::WeakWatcher;
 
-fn main() -> Result<(), Error> {
+fn select_path_event<P: AsRef<Path>>(
+    filters: &[GlobMatcher],
+    path: P,
+    conf_event: EventType,
+    target_event: EventType,
+) -> Option<PathEvent> {
+    if conf_event & target_event != EventType::NONE
+        && filters.iter().all(|f| f.is_match(path.as_ref()))
+    {
+        Some(PathEvent::new(path, target_event))
+    } else {
+        None
+    }
+}
+
+fn main() -> Result<()> {
     let config = ArgConf::from_args();
     vlog::set_verbosity_level(usize::from(config.verbose));
+    v2!("Config: {:#?}", config);
 
     let (tx, rx) = channel();
     let delay = Duration::from_secs(1);
@@ -44,22 +63,50 @@ fn main() -> Result<(), Error> {
     loop {
         match rx.recv() {
             Ok(event) => {
-                match event {
-                    Create(path) => unimplemented!(),
-                    Remove(path) => unimplemented!(),
-                    Write(path) => unimplemented!(),
-                    Rename(old_path, new_path) => unimplemented!(),
-                    _ => unimplemented!(),
+                v0!("{:?}", event);
+
+                let event_opt = match &event {
+                    Create(path) => select_path_event(
+                        &config.filter,
+                        path,
+                        config.event,
+                        EventType::CREATED,
+                    ),
+                    Remove(path) => select_path_event(
+                        &config.filter,
+                        path,
+                        config.event,
+                        EventType::DELETED,
+                    ),
+                    Write(path) => select_path_event(
+                        &config.filter,
+                        path,
+                        config.event,
+                        EventType::MODIFIED,
+                    ),
+                    Rename(old_path, _) => select_path_event(
+                        &config.filter,
+                        old_path,
+                        config.event,
+                        EventType::MOVED,
+                    ),
+                    _ => None,
+                };
+
+                if let Some(path_event) = event_opt {
+                    let action_res = match &config.action {
+                        ActionConf::Cmd { cmd, .. } => {
+                            let cmd_action = CmdAction::new(cmd);
+                            cmd_action.invoke(&path_event)
+                        }
+                    };
+
+                    if let Err(e) = action_res {
+                        ve0!("Action error: {}", e);
+                    }
                 }
 
-                // match &config.action {
-                //     ActionConf::Cmd { cmd, .. } => {
-                //         // let interpolated_cmd = strfmt(&cmd, )
-                //         v1!("Running shell template command: ")
-                //     }
-                // }
-
-                v0!("{:?}", event);
+                v2!("Event: {:?}", event);
             }
             Err(e) => ve0!("Watch error: {:?}", e),
         }
