@@ -24,7 +24,10 @@ mod args;
 mod types;
 mod watchers;
 
-use actions::{base::{Action, Result}, CmdAction};
+use actions::{
+    base::{Action, Result},
+    CmdAction,
+};
 use args::{ActionConf, ArgConf};
 use types::{EventType, PathEvent};
 use watchers::WeakWatcher;
@@ -46,21 +49,22 @@ fn main() -> Result<()> {
     watcher.watch(&config.path, RecursiveMode::Recursive)?;
     v1!("Filewatch Trigger has started, CTRL-C to terminate...");
 
-    let select_path_event = |path: &Path, target_event| -> Result<Option<PathEvent>> {
-        if config.event & target_event != EventType::NONE
-            && config.filters.iter().any(|filter| filter.is_match(path))
-        {
-            let triggered_path = if config.relative {
-                path.strip_prefix(env::current_dir()?)?.to_owned()
-            } else {
-                path.absolutize()?
-            };
+    let select_path_event =
+        |path: &Path, target_event| -> Result<Option<PathEvent>> {
+            if config.event & target_event != EventType::NONE
+                && config.filters.iter().any(|filter| filter.is_match(path))
+            {
+                let triggered_path = if config.relative {
+                    path.strip_prefix(env::current_dir()?)?.to_owned()
+                } else {
+                    path.absolutize()?
+                };
 
-            Ok(Some(PathEvent::new(triggered_path, target_event)))
-        } else {
-            Ok(None)
-        }
-    };
+                Ok(Some(PathEvent::new(triggered_path, target_event)))
+            } else {
+                Ok(None)
+            }
+        };
 
     loop {
         match rx.recv() {
@@ -83,8 +87,11 @@ fn main() -> Result<()> {
                             print_stderr,
                             ..
                         } => {
-                            let cmd_action =
-                                CmdAction::new(cmd, *print_stdout, *print_stderr);
+                            let cmd_action = CmdAction::new(
+                                cmd,
+                                *print_stdout,
+                                *print_stderr,
+                            );
                             cmd_action.invoke(&path_event)
                         }
                     };

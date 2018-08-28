@@ -1,4 +1,7 @@
-use std::{process::{Command, Output}, str};
+use std::{
+    process::{Command, Output},
+    str,
+};
 use strfmt::strfmt;
 
 use actions::{Action, Result};
@@ -10,7 +13,11 @@ pub struct CmdAction {
     pub print_stderr: bool,
 }
 
-fn run_raw_command(cmd: &str, print_stdout: bool, print_stderr: bool) -> Result<Output> {
+fn run_raw_command(
+    cmd: &str,
+    print_stdout: bool,
+    print_stderr: bool,
+) -> Result<Output> {
     let output = if cfg!(target_os = "windows") {
         Ok(Command::new("cmd").args(&["/C", cmd]).output()?)
     } else {
@@ -58,6 +65,7 @@ impl Action for CmdAction {
         };
 
         let interpolated_cmd = strfmt(&self.cmd, &mapping)?;
-        run_raw_command(&interpolated_cmd, self.print_stdout, self.print_stderr).map(|_| ())
+        run_raw_command(&interpolated_cmd, self.print_stdout, self.print_stderr)
+            .map(|_| ())
     }
 }
