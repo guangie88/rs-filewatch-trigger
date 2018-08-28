@@ -60,13 +60,6 @@ after_success:
   if [ "$PUBLISH" = "true" ] && [ -n "$TRAVIS_TAG" ]; then
     # publish when this is a new tag
     cargo login "$CRATES_TOKEN"
-
-    # publish all self dependency libraries first
-    cd ignore-lib
-    cargo publish
-    cd ..
-    
-    # then publish binary
     cargo publish
   elif [ "$ARTIFACT" = "true" ] && [ -n "$TRAVIS_TAG" ]; then
     # upload binary artifact when this is a new tag
