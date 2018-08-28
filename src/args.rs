@@ -1,15 +1,6 @@
 use std::path::PathBuf;
 
-bitflags! {
-    struct EventType: u8 {
-        const NONE = 0b00000000;
-        const CREATED = 0b00000001;
-        const DELETED = 0b00000010;
-        const MODIFIED = 0b00000100;
-        const MOVED = 0b00001000;
-        const ALL = Self::CREATED.bits | Self::DELETED.bits | Self::MODIFIED.bits | Self::MOVED.bits;
-    }
-}
+use actions::base::EventType;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -30,7 +21,7 @@ pub struct ArgConf {
 
     /// Event type to trigger on (0=NONE, 1=CREATED, 2=DELETED, 4=MODIFIED, 8=MOVED)
     #[structopt(short = "e", long = "event", default_value = "1")]
-    pub event: u8,
+    pub event: EventType,
 
     /// Force using polling implementation, works for any platform
     #[structopt(long = "force-poll")]
@@ -50,7 +41,10 @@ pub struct ArgConf {
 pub enum ActionConf {
     #[structopt(name = "cmd")]
     Cmd {
-        #[structopt(short = "c", long = "cmd")]
+        /// Shell template command to run with string interpolation:
+        /// ({path}: triggered file path)
+        /// ({event}: event type number)
+        #[structopt()]
         cmd: String,
     },
 }
