@@ -66,45 +66,46 @@ fn main() -> Result<()> {
             }
         };
 
-    loop {
-        match rx.recv() {
-            Ok(event) => {
-                let path_event = match &event {
-                    Create(path) => select_path_event(path, EventType::CREATED),
-                    Remove(path) => select_path_event(path, EventType::DELETED),
-                    Write(path) => select_path_event(path, EventType::MODIFIED),
-                    Rename(old_path, _) => {
-                        select_path_event(old_path, EventType::MOVED)
-                    }
-                    _ => Ok(None),
-                }?;
+    let loop_recv = || -> Result<Option<PathEvent>> {
+        let event = rx.recv()?;
 
-                if let Some(path_event) = path_event {
-                    let action_res = match &config.action {
-                        ActionConf::Cmd {
-                            cmd,
-                            print_stdout,
-                            print_stderr,
-                            ..
-                        } => {
-                            let cmd_action = CmdAction::new(
-                                cmd,
-                                *print_stdout,
-                                *print_stderr,
-                            );
-                            cmd_action.invoke(&path_event)
-                        }
-                    };
-
-                    match action_res {
-                        Ok(()) => {
-                            v2!("Invoked action on path: {:?}", path_event.path)
-                        }
-                        Err(e) => ve0!("Action error: {}", e),
-                    }
-                }
+        let path_event = match &event {
+            Create(path) => select_path_event(path, EventType::CREATED),
+            Remove(path) => select_path_event(path, EventType::DELETED),
+            Write(path) => select_path_event(path, EventType::MODIFIED),
+            Rename(old_path, _) => {
+                select_path_event(old_path, EventType::MOVED)
             }
-            Err(e) => ve0!("Watch error: {:?}", e),
+            _ => Ok(None),
+        }?;
+
+        if let Some(path_event) = path_event {
+            match &config.action {
+                ActionConf::Cmd {
+                    cmd,
+                    print_stdout,
+                    print_stderr,
+                    ..
+                } => {
+                    let cmd_action =
+                        CmdAction::new(cmd, *print_stdout, *print_stderr);
+                    cmd_action.invoke(&path_event)
+                }
+            }?;
+
+            Ok(Some(path_event))
+        } else {
+            Ok(None)
+        }
+    };
+
+    loop {
+        match loop_recv() {
+            Ok(Some(path_event)) => {
+                v2!("Invoked action on path: {:?}", path_event.path)
+            }
+            Err(e) => ve0!("Error: {:?}", e),
+            _ => (),
         }
     }
 }

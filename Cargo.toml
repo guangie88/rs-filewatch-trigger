@@ -1,6 +1,6 @@
 [package]
 name = "rs-filewatch-trigger"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Chen Weiguang <chen.weiguang@gmail.com>"]
 description = "FileWatch Trigger to run various actions"
 repository = "https://github.com/guangie88/rs-filewatch-trigger"
