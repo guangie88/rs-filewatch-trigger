@@ -54,7 +54,7 @@ script:
     docker-compose -f docker-compose.build.yml run -u $UID:`id -g` build
     mkdir $ARTIFACTS_DIR
     cp ./target/x86_64-unknown-linux-musl/release/$BINARY_NAME $ARTIFACTS_DIR
-  elif [ "$DOCKER_PUSH" = "true" ]; then
+  elif [ "$DOCKER_BUILD" = "true" ]; then
     docker build . -t "$IMAGE_NAME"
     docker run --rm "$IMAGE_NAME" $BINARY_NAME -V
   elif [ "$COVERAGE" = "true" ]; then
