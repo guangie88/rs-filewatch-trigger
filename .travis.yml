@@ -56,7 +56,7 @@ script:
     cp ./target/x86_64-unknown-linux-musl/release/$BINARY_NAME $ARTIFACTS_DIR
   elif [ "$DOCKER_PUSH" = "true" ]; then
     docker build . -t "$IMAGE_NAME"
-    docker run --rm -it "$IMAGE_NAME" $BINARY_NAME -V
+    docker run --rm "$IMAGE_NAME" $BINARY_NAME -V
   elif [ "$COVERAGE" = "true" ]; then
     echo "Coverage not dealing with 'script'"
   else
@@ -89,7 +89,7 @@ after_success:
       --upload-file $ZIP_FILE \
       "https://uploads.github.com/repos/$REPO_USERNAME/$REPO_NAME/releases/$TAG_ID/assets?name=$ZIP_FILE"
   elif [ "$DOCKER_BUILD" = "true" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    docker push "$IMAGE_NAME"
+    docker push $IMAGE_NAME
 
     if [ -n "$TRAVIS_TAG" ]; then
       docker tag $IMAGE_NAME $IMAGE_NAME:${TRAVIS_TAG}
