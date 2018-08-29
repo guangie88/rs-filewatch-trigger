@@ -10,5 +10,4 @@ RUN set -x \
 
 FROM alpine:3.8
 
-WORKDIR /app
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/fwt ./
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/fwt /usr/local/bin/
