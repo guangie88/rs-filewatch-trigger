@@ -5,20 +5,24 @@ env:
   - BINARY_NAME=fwt
   - REPO_USERNAME=guangie88
   - REPO_NAME=rs-filewatch-trigger
+  - IMAGE_NAME=$DOCKER_USERNAME/$REPO_NAME
 
 matrix:
   include:
   - services: docker
     env:
-      - LINT=true
-      - PUBLISH=true
+    - LINT=true
+    - PUBLISH=true
   - services: docker
     env:
-      - ARTIFACT=true
-      - ARTIFACTS_DIR=./artifacts
+    - DOCKER_BUILD=true
   - services: docker
     env:
-      - COVERAGE=true
+    - ARTIFACT=true
+    - ARTIFACTS_DIR=./artifacts
+  - services: docker
+    env:
+    - COVERAGE=true
   - rust: stable
     sudo: false
   - rust: beta
@@ -34,6 +38,8 @@ before_script:
     docker-compose -f docker-compose.lint-test.yml build lint-test
   elif [ "$ARTIFACT" = "true" ]; then
     echo "Artifact not dealing with 'before_script'"
+  elif [ "$DOCKER_BUILD" = "true" ]; then
+    docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
   elif [ "$COVERAGE" = "true" ]; then
     echo "Coverage not dealing with 'before_script'"
   else
@@ -48,6 +54,9 @@ script:
     docker-compose -f docker-compose.build.yml run -u $UID:`id -g` build
     mkdir $ARTIFACTS_DIR
     cp ./target/x86_64-unknown-linux-musl/release/$BINARY_NAME $ARTIFACTS_DIR
+  elif [ "$DOCKER_PUSH" = "true" ]; then
+    docker build . -t "$IMAGE_NAME"
+    docker run --rm -it "$IMAGE_NAME" $BINARY_NAME -V
   elif [ "$COVERAGE" = "true" ]; then
     echo "Coverage not dealing with 'script'"
   else
@@ -79,6 +88,13 @@ after_success:
       -H "Content-Type: application/zip" \
       --upload-file $ZIP_FILE \
       "https://uploads.github.com/repos/$REPO_USERNAME/$REPO_NAME/releases/$TAG_ID/assets?name=$ZIP_FILE"
+  elif [ "$DOCKER_BUILD" = "true" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    docker push "$IMAGE_NAME"
+
+    if [ -n "$TRAVIS_TAG" ]; then
+      docker tag $IMAGE_NAME $IMAGE_NAME:${TRAVIS_TAG}
+      docker push $IMAGE_NAME:${TRAVIS_TAG}
+    fi
   elif [ "$COVERAGE" = "true" ] && [ -z "$TRAVIS_TAG" ]; then
     docker run --security-opt seccomp=unconfined -v "$PWD:/volume" \
       guangie88/ubuntu-cargo-tarpaulin:xenial-stable "
