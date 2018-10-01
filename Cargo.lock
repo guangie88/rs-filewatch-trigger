@@ -472,7 +472,7 @@ dependencies = [
 
 [[package]]
 name = "rs-filewatch-trigger"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",

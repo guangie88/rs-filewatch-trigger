@@ -42,6 +42,12 @@ use args::{ActionConf, ArgConf};
 use types::{EventType, PathEvent};
 use watchers::WeakWatcher;
 
+enum Event {
+    Path(PathEvent),
+    Nothing,
+    Signal,
+}
+
 fn main() -> Result<()> {
     // config set-up
     let config = ArgConf::from_args();
@@ -56,12 +62,12 @@ fn main() -> Result<()> {
     // for handling of signals
     unsafe {
         signal_hook::register(signal_hook::SIGINT, move || {
-            v1!("Detected SIGINT for termination...");
-            
+            v1!("Terminating...");
+
             match signal_tx.try_lock() {
                 Ok(tx) => {
                     if let Err(e) = tx.send(Error(
-                        notify::Error::Generic("SIGNALLED".to_owned()),
+                        notify::Error::Generic("Signal failure".to_owned()),
                         None,
                     )) {
                         ve1!("Tx error: {}", e);
@@ -83,24 +89,24 @@ fn main() -> Result<()> {
     watcher.watch(&config.path, RecursiveMode::Recursive)?;
     v1!("Filewatch Trigger has started, CTRL-C to terminate...");
 
-    let select_path_event =
-        |path: &Path, target_event| -> Result<Option<PathEvent>> {
-            if config.event & target_event != EventType::NONE
-                && config.filters.iter().any(|filter| filter.is_match(path))
-            {
-                let triggered_path = if config.relative {
-                    path.strip_prefix(env::current_dir()?)?.to_owned()
-                } else {
-                    path.absolutize()?
-                };
-
-                Ok(Some(PathEvent::new(triggered_path, target_event)))
+    let select_path_event = |path: &Path, target_event| -> Result<Event> {
+        if config.event & target_event != EventType::NONE
+            && config.filters.iter().any(|filter| filter.is_match(path))
+        {
+            let triggered_path = if config.relative {
+                path.strip_prefix(env::current_dir()?)?.to_owned()
             } else {
-                Ok(None)
-            }
-        };
+                path.absolutize()?
+            };
 
-    let loop_recv = || -> Result<Option<PathEvent>> {
+            Ok(Event::Path(PathEvent::new(triggered_path, target_event)))
+        } else {
+            Ok(Event::Nothing)
+        }
+    };
+
+    // loop handling
+    let loop_recv = || -> Result<Event> {
         let event = rx.recv()?;
 
         let path_event = match &event {
@@ -110,15 +116,16 @@ fn main() -> Result<()> {
             Rename(old_path, _) => {
                 select_path_event(old_path, EventType::MOVED)
             }
-            Error(_, None) => Ok(None),
-            Error(ref e, _) => {
-                ve1!("Path event error: {}", e);
-                Ok(None)
-            },
-            _ => Ok(None),
-        }?;
+            Error(_, None) => Ok(Event::Signal),
+            other => {
+                if let Error(ref e, _) = other {
+                    ve1!("Path event error: {}", e);
+                }
+                Ok(Event::Nothing)
+            }
+        };
 
-        if let Some(path_event) = path_event {
+        if let Ok(Event::Path(ref path_event)) = path_event {
             match &config.action {
                 ActionConf::Cmd {
                     cmd,
@@ -128,23 +135,25 @@ fn main() -> Result<()> {
                 } => {
                     let cmd_action =
                         CmdAction::new(cmd, *print_stdout, *print_stderr);
+
                     cmd_action.invoke(&path_event)
                 }
             }?;
-
-            Ok(Some(path_event))
-        } else {
-            Ok(None)
         }
+
+        path_event
     };
 
     loop {
         match loop_recv() {
-            Ok(Some(path_event)) => {
+            Ok(Event::Path(path_event)) => {
                 v2!("Invoked action on path: {:?}", path_event.path)
             }
+            Ok(Event::Signal) => break,
+            Ok(Event::Nothing) => (),
             Err(e) => ve0!("Error: {:?}", e),
-            _ => (),
         }
     }
+
+    Ok(())
 }

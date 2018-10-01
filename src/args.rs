@@ -13,7 +13,7 @@ pub struct ArgConf {
     pub action: ActionConf,
 
     /// Directory path to watch recursive
-    #[structopt(short = "p", long = "path", parse(from_os_str))]
+    #[structopt(parse(from_os_str))]
     pub path: PathBuf,
 
     /// Glob pattern(s) for file matching (comma delimited)
