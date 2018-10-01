@@ -1,7 +1,7 @@
 # source: https://github.com/starkat99/appveyor-rust/blob/master/appveyor.yml
 # source: https://github.com/japaric/rust-everywhere/blob/master/appveyor.yml
 
-version: 0.1.1-build{build}
+version: 0.2.0-build{build}
 
 matrix:
   fast_finish: true

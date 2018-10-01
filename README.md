@@ -33,7 +33,7 @@ The following contains the help message:
 
 ```bash
 USAGE:
-    fwt [FLAGS] [OPTIONS] --path <path> <SUBCOMMAND>
+    fwt [FLAGS] [OPTIONS] <path> <SUBCOMMAND>
 
 FLAGS:
         --force-poll    Force using polling implementation, works for any platform
@@ -43,10 +43,12 @@ FLAGS:
     -v, --verbose       Verbose mode (-v, -vv, -vvv)
 
 OPTIONS:
-    -d, --delay <delay_ms>     Delay interval in milliseconds between each file watch detection[default: 1000]
+    -d, --delay <delay_ms>     Delay interval in milliseconds between each file watch detection [default: 1000]
     -e, --event <event>        Event type to trigger on (0=NONE, 1=CREATED, 2=DELETED, 4=MODIFIED, 8=MOVED) [default: 1]
     -f, --filters <filters>    Glob pattern(s) for file matching (comma delimited) [default: *.*]
-    -p, --path <path>          Directory path to watch recursive
+
+ARGS:
+    <path>    Directory path to watch recursive
 
 SUBCOMMANDS:
     cmd     FileWatch Trigger to run various actions

@@ -7,6 +7,7 @@ extern crate globset;
 extern crate maplit;
 extern crate notify;
 extern crate path_absolutize;
+extern crate signal_hook;
 extern crate strfmt;
 extern crate structopt;
 #[macro_use]
@@ -14,9 +15,13 @@ extern crate structopt_derive;
 #[macro_use]
 extern crate vlog;
 
-use notify::{watcher, DebouncedEvent::*, PollWatcher, RecursiveMode, Watcher};
+use notify::{
+    watcher,
+    DebouncedEvent::{Create, Error, Remove, Rename, Write},
+    PollWatcher, RecursiveMode, Watcher,
+};
 use path_absolutize::Absolutize;
-use std::{env, path::Path, sync::mpsc::channel, time::Duration};
+use std::{env, path::Path, process, sync::mpsc::channel, time::Duration};
 use structopt::StructOpt;
 
 mod actions;
@@ -32,11 +37,27 @@ use args::{ActionConf, ArgConf};
 use types::{EventType, PathEvent};
 use watchers::WeakWatcher;
 
+enum Event {
+    Path(PathEvent),
+    Nothing,
+}
+
 fn main() -> Result<()> {
+    // config set-up
     let config = ArgConf::from_args();
+
     vlog::set_verbosity_level(usize::from(config.verbose));
     v3!("Config: {:#?}", config);
 
+    // for handling of signals
+    unsafe {
+        signal_hook::register(signal_hook::SIGINT, || {
+            v1!("Terminating...");
+            process::exit(0);
+        })?;
+    }
+
+    // watcher set-up
     let (tx, rx) = channel();
     let delay = Duration::from_millis(config.delay_ms);
 
@@ -49,24 +70,24 @@ fn main() -> Result<()> {
     watcher.watch(&config.path, RecursiveMode::Recursive)?;
     v1!("Filewatch Trigger has started, CTRL-C to terminate...");
 
-    let select_path_event =
-        |path: &Path, target_event| -> Result<Option<PathEvent>> {
-            if config.event & target_event != EventType::NONE
-                && config.filters.iter().any(|filter| filter.is_match(path))
-            {
-                let triggered_path = if config.relative {
-                    path.strip_prefix(env::current_dir()?)?.to_owned()
-                } else {
-                    path.absolutize()?
-                };
-
-                Ok(Some(PathEvent::new(triggered_path, target_event)))
+    let select_path_event = |path: &Path, target_event| -> Result<Event> {
+        if config.event & target_event != EventType::NONE
+            && config.filters.iter().any(|filter| filter.is_match(path))
+        {
+            let triggered_path = if config.relative {
+                path.strip_prefix(env::current_dir()?)?.to_owned()
             } else {
-                Ok(None)
-            }
-        };
+                path.absolutize()?
+            };
 
-    let loop_recv = || -> Result<Option<PathEvent>> {
+            Ok(Event::Path(PathEvent::new(triggered_path, target_event)))
+        } else {
+            Ok(Event::Nothing)
+        }
+    };
+
+    // loop handling
+    let loop_recv = || -> Result<Event> {
         let event = rx.recv()?;
 
         let path_event = match &event {
@@ -76,10 +97,15 @@ fn main() -> Result<()> {
             Rename(old_path, _) => {
                 select_path_event(old_path, EventType::MOVED)
             }
-            _ => Ok(None),
-        }?;
+            other => {
+                if let Error(ref e, _) = other {
+                    ve1!("Path event error: {}", e);
+                }
+                Ok(Event::Nothing)
+            }
+        };
 
-        if let Some(path_event) = path_event {
+        if let Ok(Event::Path(ref path_event)) = path_event {
             match &config.action {
                 ActionConf::Cmd {
                     cmd,
@@ -89,23 +115,22 @@ fn main() -> Result<()> {
                 } => {
                     let cmd_action =
                         CmdAction::new(cmd, *print_stdout, *print_stderr);
+
                     cmd_action.invoke(&path_event)
                 }
             }?;
-
-            Ok(Some(path_event))
-        } else {
-            Ok(None)
         }
+
+        path_event
     };
 
     loop {
         match loop_recv() {
-            Ok(Some(path_event)) => {
+            Ok(Event::Path(path_event)) => {
                 v2!("Invoked action on path: {:?}", path_event.path)
             }
+            Ok(Event::Nothing) => (),
             Err(e) => ve0!("Error: {:?}", e),
-            _ => (),
         }
     }
 }

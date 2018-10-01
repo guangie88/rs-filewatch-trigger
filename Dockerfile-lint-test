@@ -1,4 +1,4 @@
-FROM guangie88/rs-cider:1.28.0
+FROM guangie88/rust:1.29.1
 
 WORKDIR /app
 COPY ./Cargo.toml ./Cargo.lock ./rustfmt.toml ./
@@ -8,5 +8,5 @@ RUN set -x \
 
 COPY ./src/ ./src/
 
-RUN cargo +nightly clippy --all \
+RUN cargo clippy --all \
     && cargo test --all --no-run
