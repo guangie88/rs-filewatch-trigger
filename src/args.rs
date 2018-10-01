@@ -4,7 +4,8 @@ use types::{EventType, GlobMatchers};
 
 #[derive(StructOpt, Debug)]
 #[structopt(
-    name = "FileWatch Trigger Rust Application", about = "Configuration for FWT"
+    name = "FileWatch Trigger Rust Application",
+    about = "Configuration for FWT"
 )]
 pub struct ArgConf {
     /// Action to trigger

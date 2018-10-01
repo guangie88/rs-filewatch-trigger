@@ -7,6 +7,7 @@ extern crate globset;
 extern crate maplit;
 extern crate notify;
 extern crate path_absolutize;
+extern crate signal_hook;
 extern crate strfmt;
 extern crate structopt;
 #[macro_use]
@@ -14,9 +15,18 @@ extern crate structopt_derive;
 #[macro_use]
 extern crate vlog;
 
-use notify::{watcher, DebouncedEvent::*, PollWatcher, RecursiveMode, Watcher};
+use notify::{
+    watcher,
+    DebouncedEvent::{Create, Error, Remove, Rename, Write},
+    PollWatcher, RecursiveMode, Watcher,
+};
 use path_absolutize::Absolutize;
-use std::{env, path::Path, sync::mpsc::channel, time::Duration};
+use std::{
+    env,
+    path::Path,
+    sync::{mpsc::channel, Mutex},
+    time::Duration,
+};
 use structopt::StructOpt;
 
 mod actions;
@@ -33,11 +43,35 @@ use types::{EventType, PathEvent};
 use watchers::WeakWatcher;
 
 fn main() -> Result<()> {
+    // config set-up
     let config = ArgConf::from_args();
+
     vlog::set_verbosity_level(usize::from(config.verbose));
     v3!("Config: {:#?}", config);
 
+    // watcher set-up
     let (tx, rx) = channel();
+    let signal_tx = Mutex::from(tx.clone());
+
+    // for handling of signals
+    unsafe {
+        signal_hook::register(signal_hook::SIGINT, move || {
+            v1!("Detected SIGINT for termination...");
+            
+            match signal_tx.try_lock() {
+                Ok(tx) => {
+                    if let Err(e) = tx.send(Error(
+                        notify::Error::Generic("SIGNALLED".to_owned()),
+                        None,
+                    )) {
+                        ve1!("Tx error: {}", e);
+                    }
+                }
+                Err(e) => ve1!("Lock error: {}", e),
+            };
+        })?;
+    }
+
     let delay = Duration::from_millis(config.delay_ms);
 
     let mut watcher: Box<WeakWatcher> = if !config.force_poll {
@@ -76,6 +110,11 @@ fn main() -> Result<()> {
             Rename(old_path, _) => {
                 select_path_event(old_path, EventType::MOVED)
             }
+            Error(_, None) => Ok(None),
+            Error(ref e, _) => {
+                ve1!("Path event error: {}", e);
+                Ok(None)
+            },
             _ => Ok(None),
         }?;
 
