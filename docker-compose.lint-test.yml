@@ -8,5 +8,5 @@ services:
       - bash
       - '-c'
       - 'rustfmt --check src/**.rs
-         && cargo +nightly clippy --all
+         && cargo clippy --all
          && cargo test --all'

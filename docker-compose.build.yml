@@ -8,7 +8,8 @@ services:
       - '--release'
     volumes:
       - '.:/volume'
-    env_file: .env-build
+    environment:
+      HOME: /volume
   clean:
     image: 'clux/muslrust:stable'
     command:
@@ -16,4 +17,5 @@ services:
       - clean
     volumes:
       - '.:/volume'
-    env_file: .env-build
+    environment:
+      HOME: /volume
