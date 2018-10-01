@@ -21,12 +21,7 @@ use notify::{
     PollWatcher, RecursiveMode, Watcher,
 };
 use path_absolutize::Absolutize;
-use std::{
-    env,
-    path::Path,
-    sync::{mpsc::channel, Mutex},
-    time::Duration,
-};
+use std::{env, path::Path, process, sync::mpsc::channel, time::Duration};
 use structopt::StructOpt;
 
 mod actions;
@@ -45,7 +40,6 @@ use watchers::WeakWatcher;
 enum Event {
     Path(PathEvent),
     Nothing,
-    Signal,
 }
 
 fn main() -> Result<()> {
@@ -55,29 +49,16 @@ fn main() -> Result<()> {
     vlog::set_verbosity_level(usize::from(config.verbose));
     v3!("Config: {:#?}", config);
 
-    // watcher set-up
-    let (tx, rx) = channel();
-    let signal_tx = Mutex::from(tx.clone());
-
     // for handling of signals
     unsafe {
-        signal_hook::register(signal_hook::SIGINT, move || {
+        signal_hook::register(signal_hook::SIGINT, || {
             v1!("Terminating...");
-
-            match signal_tx.try_lock() {
-                Ok(tx) => {
-                    if let Err(e) = tx.send(Error(
-                        notify::Error::Generic("Signal failure".to_owned()),
-                        None,
-                    )) {
-                        ve1!("Tx error: {}", e);
-                    }
-                }
-                Err(e) => ve1!("Lock error: {}", e),
-            };
+            process::exit(0);
         })?;
     }
 
+    // watcher set-up
+    let (tx, rx) = channel();
     let delay = Duration::from_millis(config.delay_ms);
 
     let mut watcher: Box<WeakWatcher> = if !config.force_poll {
@@ -116,7 +97,6 @@ fn main() -> Result<()> {
             Rename(old_path, _) => {
                 select_path_event(old_path, EventType::MOVED)
             }
-            Error(_, None) => Ok(Event::Signal),
             other => {
                 if let Error(ref e, _) = other {
                     ve1!("Path event error: {}", e);
@@ -149,11 +129,8 @@ fn main() -> Result<()> {
             Ok(Event::Path(path_event)) => {
                 v2!("Invoked action on path: {:?}", path_event.path)
             }
-            Ok(Event::Signal) => break,
             Ok(Event::Nothing) => (),
             Err(e) => ve0!("Error: {:?}", e),
         }
     }
-
-    Ok(())
 }
