@@ -50,11 +50,14 @@ fn main() -> Result<()> {
     v3!("Config: {:#?}", config);
 
     // for handling of signals
-    unsafe {
-        signal_hook::register(signal_hook::SIGINT, || {
-            v1!("Terminating...");
-            process::exit(0);
-        })?;
+    let signals = &[signal_hook::SIGINT, signal_hook::SIGTERM];
+
+    for &signal in signals {
+        unsafe {
+            signal_hook::register(signal, || {
+                process::exit(0);
+            })?;
+        }
     }
 
     // watcher set-up
