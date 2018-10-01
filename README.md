@@ -62,8 +62,8 @@ Assuming the current working directory is `/home/xxx`:
 ```bash
 fwt -e 15 \
     -f "*.jpg,*.png" \
-    -p . \
     -v \
+    . \
     cmd --print-stdout "echo {path}: {event}"
 ```
 
@@ -77,7 +77,7 @@ The following contains the help message for this action:
 
 ```bash
 USAGE:
-    fwt --path <path> cmd [FLAGS] <cmd>
+    fwt cmd [FLAGS] <cmd>
 
 FLAGS:
     -h, --help            Prints help information
